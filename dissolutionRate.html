@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探究溫度對溶解速率的影響</title>
+    <img src="https://imagedb.museum.eduhk.hk/media/7a/f9/c5/7af9c528e521498f96664195ba08c54d.jpg"  alt="這是圖片" title="flask"
+    width="200px"
+    height="200px;">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/regression@2.0.1/dist/regression.min.js"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2D82B7',
+            secondary: '#42B883',
+            accent: '#FF6B6B',
+            info: '#4FC3F7',
+            warning: '#FFB74D',
+            light: '#f8fafc',
+            dark: '#1e293b'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+    
+    :root {
+      --primary-color: #2D82B7;
+      --secondary-color: #42B883;
+      --accent-color: #FF6B6B;
+      --info-color: #4FC3F7;
+      --warning-color: #FFB74D;
+      --bubble-color: rgba(45, 130, 183, 0.1);
+    }
+
+    body {
+      background-color: #f0f4f8;
+      color: #333333;
+      font-family: 'Nunito', sans-serif;
+      background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjMjk4MkI3IiBmaWxsLW9wYWNpdHk9IjAuMDUiPjxwYXRoIGQ9Ik0wIDBoNDB2NDBoLTQweiIvPjxwYXRoIGQ9Ik0yMCAyMGMyLjc2IDAgNS0yLjI0IDUtNXMtMi4yNC01LTUtNS01IDIuMjQtNSA1IDIuMjQgNSA1IDV6bTAgMmMtMi43NiAwLTUgMi4yNC01IDVzMi4yNCA1IDUgNSA1LTIuMjQgNS01LTIuMjQtNS01LTV6Ii8+PC9nPjwvc3ZnPg==');
+    }
+    
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0;
+    }
+    
+    .accordion-content.open {
+      max-height: 800px; /* 增加高度以容納所有内容 */
+      padding-top: 1rem !important;
+      padding-bottom: 1rem !important;
+    }
+    
+    /* 卡片效果 */
+    .science-card {
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 15px rgba(45, 130, 183, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      overflow: hidden;
+      background: white;
+      position: relative;
+    }
+    
+    .science-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(45, 130, 183, 0.2);
+    }
+    
+    /* 科學氣泡背景效果 */
+    .bubble {
+      position: absolute;
+      border-radius: 50%;
+      background: var(--bubble-color);
+      z-index: 0;
+      opacity: 0.7;
+    }
+    
+    /* 為進度條添加樣式 */
+    .progress-container {
+      width: 100%;
+      background-color: #f3f4f6;
+      border-radius: 0.25rem;
+      margin: 0.5rem 0;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .progress-bar {
+      height: 0.6rem;
+      background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+      width: 0%;
+      transition: width 0.3s ease;
+      border-radius: 0.25rem;
+      background-size: 200% 100%;
+      animation: gradientMove 2s linear infinite;
+    }
+    
+    @keyframes gradientMove {
+      0% {background-position: 0% 0%;}
+      100% {background-position: 200% 0%;}
+    }
+    
+    /* 增加滑動條樣式 */
+    .slider-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      margin: 8px 0;
+    }
+    
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    
+    .slider-label {
+      font-size: 0.875rem;
+      color: #4b5563;
+    }
+    
+    .slider-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #4b5563;
+      min-width: 60px;
+      text-align: right;
+    }
+    
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 5px;
+      outline: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--primary-color);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.15s ease-in-out;
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--primary-color);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.15s ease-in-out;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover,
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #134e6f; /* 更深的藍色 */
+    }
+    
+    input[type="range"]:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    input[type="range"]:disabled::-webkit-slider-thumb,
+    input[type="range"]:disabled::-moz-range-thumb {
+      cursor: not-allowed;
+    }
+    
+    /* 提示訊息樣式 */
+    .alert {
+      border-radius: 0.25rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid;
+    }
+    
+    .alert-info {
+      background-color: #e1f5fe;
+      border-color: #03a9f4;
+      color: #0277bd;
+    }
+    
+    /* 模態對話框樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-content {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      max-width: 90%;
+      width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-textarea {
+      width: 100%;
+      min-height: 150px;
+      font-family: monospace;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.25rem;
+      padding: 0.5rem;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+      white-space: pre;
+    }
+    
+    /* 訓練進度模態框樣式 */
+    .progress-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+    }
+    
+    .progress-modal-content {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      max-width: 90%;
+      width: 600px;
+    }
+    
+    /* 進度條文字資訊 */
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      text-sm: true;
+      font-weight: 500;
+      margin-top: 0.5rem;
+      color: #4b5563;
+    }
+    
+  </style>
+</head>
+
+
+<body>
+    <div class="container">
+        <h1>探究溫度對溶解速率的影響</h1>
+        <input type="number" id="temp" placeholder="溶劑起始溫度 (°C)" required>
+        <input type="number" id="time" placeholder="溶解時間 (s)" required>
+        <button onclick="addData()">加入數據</button>
+        <button onclick="trainModel()">開始訓練模型</button>
+        <button onclick="clearData()">清空</button>
+
+        <h2>提示</h2>
+        <div class="mb-4 p-3 bg-blue-50 border-l-4 border-info rounded-md">
+          <div class="flex items-start">
+        
+            <div>
+                <p style="color:#f00;">
+            1. 請輸入溶劑起始溫度和溶解時間，點擊加入數據按鈕
+                </p>
+                <p style="color:#f90;"">
+            2. 點擊開始訓練模型按鈕後，模型將學習數據,展示圖表
+                </p>
+                <p style="color:#FF6B6B;"">
+            3. 溶劑溫度越高，通常會提高溶解速率。記錄至少3個不同數據點，會有更準確結果
+                </p>
+                <p style="color:#d66bf3;"">
+            4. 在預測處輸入新溫度，將能預測溶解時間
+                </p>
+            </div>
+          </div>
+        </div>
+
+        
+
+    </div>
+
+
+    <div style="float: left; width: 50%;">
+
+        <h3>數據圖表</h3>
+            <p style="color:#4FC3F7;"">
+            線性模型的數學公式
+            </p>
+        <img src="https://developers.google.com/static/machine-learning/crash-course/linear-regression/images/equation.png?hl=zh-tw
+"width="400px" height="300px;">
+
+        <div id="predictionResult"></div>
+        <canvas id="regressionChart" width="200" height="100"></canvas>
+        <div id="error" class="error"></div>
+    </div>
+
+
+
+
+  <div style="float: right; width: 50%;">
+    <h2>預測</h2>
+        <input type="number" id="newTemp" placeholder="新的溫度 (°C)" required>
+        <button onclick="predict()">預測溶解時間</button>
+    </div>
+
+
+    <script>
+        let data = [];
+        let model = null;
+        let chart = null;
+
+        function addData() {
+            const temp = parseFloat(document.getElementById('temp').value);
+            const time = parseFloat(document.getElementById('time').value);
+            if (!isNaN(temp) && !isNaN(time)) {
+                data.push([temp, time]);
+                document.getElementById('temp').value = '';
+                document.getElementById('time').value = '';
+                document.getElementById('error').textContent = '';
+            } else {
+                document.getElementById('error').textContent = '請輸入有效的數字。';
+            }
+        }
+
+        function trainModel() {
+            if (data.length < 2) {
+                document.getElementById('error').textContent = '需要至少兩個數據點才能訓練模型。';
+                return;
+            }
+
+            const regressionResult = regression.linear(data);
+            model = regressionResult;
+
+            const X = data.map(d => d[0]);
+            const y = data.map(d => d[1]);
+
+            drawChart(X, y, regressionResult);
+        }
+
+        function drawChart(X, y, regressionResult) {
+            const ctx = document.getElementById('regressionChart').getContext('2d');
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '數據點',
+                        data: X.map((x, i) => ({ x: x, y: y[i] })),
+                        backgroundColor: 'blue',
+                        pointRadius: 5
+                    },
+                    {
+                        label: '線性回歸模型',
+                        type: 'line',
+                        data: X.map(x => ({ x: x, y: regressionResult.equation[0] * x + regressionResult.equation[1] })),
+                        borderColor: 'red',
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '溶劑起始溫度(°C)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '溶解時間 (s)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            });
+        }
+
+
+        function predict() {
+            const newTemp = parseFloat(document.getElementById('newTemp').value);
+            if (model) {
+                const predictedTime = model.equation[0] * newTemp + model.equation[1];
+                document.getElementById('predictionResult').textContent = `預測溶解時間: ${predictedTime.toFixed(2)} s`;
+            } else {
+                document.getElementById('error').textContent = '請先訓練模型。';
+            }
+        }
+
+
+
+
+        function clearData() {
+            data = [];
+            model = null;
+            document.getElementById('predictionResult').textContent = '';
+            document.getElementById('error').textContent = '';
+
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+        }
+    </script>
+</body>
+</html>
