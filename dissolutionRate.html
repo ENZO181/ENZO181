@@ -1,160 +1,356 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
+<!DOCTYPE html><html lang="zh-Hant"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>探究溫度對溶解速率的影響</title>
-    <div style="float: right; width: 50%;">
-    <img src="https://imagedb.museum.eduhk.hk/media/7a/f9/c5/7af9c528e521498f96664195ba08c54d.jpg"  alt="這是圖片" title="flask"
-    width="400px"
-    height="400px;">
-    </div>
-
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/regression@2.0.1/dist/regression.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
     <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#2D82B7',
-            secondary: '#42B883',
-            accent: '#FF6B6B',
-            info: '#4FC3F7',
-            warning: '#FFB74D',
-            light: '#f8fafc',
-            dark: '#1e293b'
-          }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#42B883',
+                        accent: '#FF6B6B',
+                        info: '#4FC3F7',
+                        warning: '#FFB74D'
+                    },
+                    fontFamily: {
+                        'sans': ['Noto Sans TC', 'sans-serif']
+                    }
+                }
+            }
         }
-      }
-    }
-  </script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
-   
-    
-    .accordion-content.open {
-      max-height: 800px; /* 增加高度以容納所有内容 */
-      padding-top: 1rem !important;
-      padding-bottom: 1rem !important;
-    }
-    
-    
-    /* 科學氣泡背景效果 */
-    .bubble {
-      position: absolute;
-      border-radius: 50%;
-      background: var(--bubble-color);
-      z-index: 0;
-      opacity: 0.7;
-    }
-    
-    
-  </style>
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dark .glass-effect {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 300px;
+            }
+        }
+    </style>
 </head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- 暗黑模式檢測 -->
+    <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
 
-
-<body>
-    <div class="container">
-        <h1>探究溫度對溶解速率的影響</h1>
-        <input type="number" id="temp" placeholder="溶劑起始溫度 (°C)" required>
-        <input type="number" id="time" placeholder="溶解時間 (s)" required>
-        <button onclick="addData()" style="background:#f50;">加入數據</button>
-        <button onclick="trainModel()" style="background:rgb(184, 153, 255);">開始訓練模型</button>
-        <button onclick="clearData()" style="background:rgb(153, 255, 231);">清空</button>
-        
-
-        <h2>如何使用</h2>
-        <div class="mb-4 p-3 bg-blue-50 border-l-4 border-info rounded-md">
-          <div class="flex items-start">
-        
-            <div>
-                <p style="color:#f00;">
-            1. 請輸入溶劑起始溫度和溶解時間，點擊加入數據按鈕
-                
-                </p>
-                <p style="color:#f90;"">
-            2. 點擊開始訓練模型按鈕後，模型將學習數據,展示圖表
-                  
-                </p>
-                <p style="color:#FF6B6B;"">
-            3. 溶劑溫度越高，通常會提高溶解速率。記錄至少3個不同數據點，會有更準確結果
-                  
-                </p>
-                <p style="color:#d66bf3;"">
-            4. 在預測處輸入新溫度，將能預測溶解時間
-                  
-                </p>
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <!-- 標題區域 -->
+        <div class="gradient-bg text-white py-12 px-4">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-col lg:flex-row items-center justify-between">
+                    <div class="lg:w-1/2 mb-8 lg:mb-0">
+                        <h1 class="text-4xl lg:text-5xl font-bold mb-4 animate-float">
+                            🧪 探究溫度對溶解速率的影響
+                        </h1>
+                        <p class="text-xl opacity-90">
+                            使用線性迴歸模型分析溫度與溶解時間的關係
+                        </p>
+                    </div>
+                    <div class="lg:w-1/2 flex justify-center">
+                        <img src="https://imagedb.museum.eduhk.hk/media/7a/f9/c5/7af9c528e521498f96664195ba08c54d.jpg" alt="實驗燒杯" class="w-64 h-64 rounded-full object-cover shadow-2xl animate-float" style="animation-delay: 0.5s">
+                    </div>
+                </div>
             </div>
-          </div>
         </div>
 
-        
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <!-- 使用說明 -->
+            <div class="mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                        📚 如何使用
+                    </h2>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border-l-4 border-red-500">
+                            <div class="font-semibold text-red-700 dark:text-red-400 mb-2">步驟 1</div>
+                            <p class="text-red-600 dark:text-red-300 text-sm">輸入溶劑起始溫度和溶解時間，點擊加入數據</p>
+                        </div>
+                        <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-xl border-l-4 border-orange-500">
+                            <div class="font-semibold text-orange-700 dark:text-orange-400 mb-2">步驟 2</div>
+                            <p class="text-orange-600 dark:text-orange-300 text-sm">點擊訓練模型，系統將分析數據並展示圖表</p>
+                        </div>
+                        <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border-l-4 border-purple-500">
+                            <div class="font-semibold text-purple-700 dark:text-purple-400 mb-2">步驟 3</div>
+                            <p class="text-purple-600 dark:text-purple-300 text-sm">記錄至少3個不同數據點，獲得更準確結果</p>
+                        </div>
+                        <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border-l-4 border-blue-500">
+                            <div class="font-semibold text-blue-700 dark:text-blue-400 mb-2">步驟 4</div>
+                            <p class="text-blue-600 dark:text-blue-300 text-sm">在預測區輸入新溫度，預測溶解時間</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            <!-- 主要功能區域 -->
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- 數據輸入區 -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+                        📊 數據輸入
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                溶劑起始溫度 (°C)
+                            </label>
+                            <input type="number" id="temp" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all" placeholder="例如：25">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                溶解時間 (秒)
+                            </label>
+                            <input type="number" id="time" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all" placeholder="例如：120">
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-3 pt-4">
+                            <button onclick="addData()" class="flex-1 min-w-0 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                📝 加入數據
+                            </button>
+                            <button onclick="trainModel()" class="flex-1 min-w-0 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                🤖 訓練模型
+                            </button>
+                            <button onclick="clearData()" class="flex-1 min-w-0 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                🗑️ 清空
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 數據列表 -->
+                    <div class="mt-6">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">已輸入的數據:</h4>
+                        <div id="dataList" class="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 max-h-40 overflow-y-auto">
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">尚無數據</p>
+                        </div>
+                    </div>
+
+                    <!-- 預測區 -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">🔮 預測溶解時間</h4>
+                        <div class="flex gap-3">
+                            <input type="number" id="newTemp" class="flex-1 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="新的溫度 (°C)">
+                            <button onclick="predict()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                預測
+                            </button>
+                        </div>
+                        <div id="predictionResult" class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-800 dark:text-blue-200 font-semibold hidden"></div>
+                    </div>
+
+                    <!-- 科學問答助手 -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                            🤖 科學問答助手
+                            <span class="ml-2 px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                                僅回答科學問題
+                            </span>
+                        </h4>
+                        
+                        <!-- 聊天記錄 -->
+                        <div id="chatHistory" class="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 max-h-96 overflow-y-auto mb-4 min-h-32">
+                            <div class="flex items-start space-x-3 mb-4">
+                                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                    🤖
+                                </div>
+                                <div class="flex-1 bg-white dark:bg-gray-600 rounded-lg p-3 shadow-sm">
+                                    <p class="text-gray-800 dark:text-gray-200 text-sm">
+                                        你好！我是科學問答助手。我可以回答關於化學、物理、溶解、溫度等科學相關的問題。有什麼科學問題想要了解嗎？
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 輸入區 -->
+                        <div class="flex gap-3">
+                            <input type="text" id="scienceQuestion" class="flex-1 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="問一個科學問題...">
+                            <button onclick="askScienceQuestion()" id="askButton" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                                🚀 提問
+                            </button>
+                        </div>
+                        
+                        <!-- 建議問題 -->
+                        <div class="mt-3">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">💡 建議問題：</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="fillSampleQuestion('為什麼溫度會影響溶解速率？')" class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors">
+                                    溶解原理
+                                </button>
+                                <button onclick="fillSampleQuestion('什麼是線性迴歸？')" class="px-3 py-1 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors">
+                                    統計分析
+                                </button>
+                                <button onclick="fillSampleQuestion('分子運動理論是什麼？')" class="px-3 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors">
+                                    分子理論
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 圖表和理論區 -->
+                <div class="space-y-6">
+                    <!-- 圖表 -->
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+                        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                            📈 數據圖表
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="regressionChart"></canvas>
+                        </div>
+                        <div id="modelInfo" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hidden">
+                            <h5 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">模型信息:</h5>
+                            <div id="equationDisplay" class="text-sm text-gray-600 dark:text-gray-400"></div>
+                            <div id="r2Display" class="text-sm text-gray-600 dark:text-gray-400"></div>
+                        </div>
+                    </div>
+
+                    <!-- 理論說明 -->
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+                        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                            🧮 線性迴歸理論
+                        </h3>
+                        <div class="mb-4 text-center">
+                            <img src="https://developers.google.com/static/machine-learning/crash-course/linear-regression/images/equation.png?hl=zh-tw" alt="線性迴歸公式" class="mx-auto rounded-lg shadow-md max-w-full h-auto">
+                        </div>
+                        <div class="space-y-3 text-gray-600 dark:text-gray-300">
+                            <p class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                                📝 線性迴歸是一種資料分析技術，可使用另一個相關且已知的資料值來預測未知資料的值。
+                            </p>
+                            <p class="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                                🎯 線性迴歸模型相對簡單，並可提供易於解釋的數學公式來產生預測。
+                            </p>
+                            <p class="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                                🌡️ 溫度越高，分子運動越活躍，通常會提高溶解速率，縮短溶解時間。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 錯誤提示 -->
+            <div id="error" class="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl hidden"></div>
+        </div>
     </div>
-
-
-    <div style="float: left; width: 50%;">
-
-
-
-        <h3>數據圖表</h3>
-            <p style="color:#4FC3F7;"">
-            線性模型的數學公式
-            </p>
-        <img src="https://developers.google.com/static/machine-learning/crash-course/linear-regression/images/equation.png?hl=zh-tw
-"width="400px" height="300px;">
-
-        <div id="predictionResult"></div>
-        <canvas id="regressionChart" width="200" height="100"></canvas>
-        <div id="error" class="error"></div>
-    </div>
-
-  <div>
-      <table>
-        <tr>
-          <td> 線性迴歸是一種資料分析技術，可使用另一個相關且已知的資料值來預測未知資料的值。
-它在數學上建模為線性方程。 </td>
-        </tr>
-          <td>線性迴歸模型相對簡單，並可提供易於解釋的數學公式來產生預測。</td>
-        </tr>
-      </table>
-      
-      <style>
-table, th, td {
-  border:1px solid black;
-}
-</style>
-  </div>
-
-  <div style="float: right; width: 50%;">
-    <h2>預測</h2>
-        <input type="number" id="newTemp" placeholder="新的溫度 (°C)" required>
-        <button onclick="predict()">預測溶解時間</button>
-    </div>
-
 
     <script>
         let data = [];
         let model = null;
         let chart = null;
 
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function updateDataList() {
+            const dataListDiv = document.getElementById('dataList');
+            if (data.length === 0) {
+                dataListDiv.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">尚無數據</p>';
+            } else {
+                dataListDiv.innerHTML = data.map((point, index) => 
+                    `<div class="flex justify-between items-center py-1 px-2 bg-white dark:bg-gray-600 rounded mb-1">
+                        <span class="text-sm">溫度: ${point[0]}°C, 時間: ${point[1]}s</span>
+                        <button onclick="removeData(${index})" class="text-red-500 hover:text-red-700 text-xs">移除</button>
+                    </div>`
+                ).join('');
+            }
+        }
+
+        function removeData(index) {
+            data.splice(index, 1);
+            updateDataList();
+            if (data.length >= 2 && model) {
+                trainModel();
+            }
+        }
+
         function addData() {
             const temp = parseFloat(document.getElementById('temp').value);
             const time = parseFloat(document.getElementById('time').value);
-            if (!isNaN(temp) && !isNaN(time)) {
-                data.push([temp, time]);
-                document.getElementById('temp').value = '';
-                document.getElementById('time').value = '';
-                document.getElementById('error').textContent = '';
-            } else {
-                document.getElementById('error').textContent = '請輸入有效的數字。';
+            
+            if (isNaN(temp) || isNaN(time)) {
+                showError('請輸入有效的數字。');
+                return;
             }
+            
+            if (temp < -273.15) {
+                showError('溫度不能低於絕對零度 (-273.15°C)。');
+                return;
+            }
+            
+            if (time <= 0) {
+                showError('溶解時間必須大於 0。');
+                return;
+            }
+
+            data.push([temp, time]);
+            document.getElementById('temp').value = '';
+            document.getElementById('time').value = '';
+            updateDataList();
+            
+            // 成功提示
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✅ 已加入';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 1000);
         }
 
         function trainModel() {
             if (data.length < 2) {
-                document.getElementById('error').textContent = '需要至少兩個數據點才能訓練模型。';
+                showError('需要至少兩個數據點才能訓練模型。');
                 return;
             }
 
@@ -165,6 +361,30 @@ table, th, td {
             const y = data.map(d => d[1]);
 
             drawChart(X, y, regressionResult);
+            showModelInfo(regressionResult);
+            
+            // 成功提示
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✅ 訓練完成';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+        }
+
+        function showModelInfo(regressionResult) {
+            const modelInfoDiv = document.getElementById('modelInfo');
+            const equationDiv = document.getElementById('equationDisplay');
+            const r2Div = document.getElementById('r2Display');
+            
+            const slope = regressionResult.equation[0].toFixed(4);
+            const intercept = regressionResult.equation[1].toFixed(4);
+            const r2 = regressionResult.r2.toFixed(4);
+            
+            equationDiv.textContent = `方程式: y = ${slope}x + ${intercept}`;
+            r2Div.textContent = `決定係數 (R²): ${r2} (${(r2 * 100).toFixed(2)}% 的變異可被解釋)`;
+            
+            modelInfoDiv.classList.remove('hidden');
         }
 
         function drawChart(X, y, regressionResult) {
@@ -174,74 +394,357 @@ table, th, td {
                 chart.destroy();
             }
 
+            const isDark = document.documentElement.classList.contains('dark');
+            
             chart = new Chart(ctx, {
                 type: 'scatter',
                 data: {
                     datasets: [{
-                        label: '數據點',
+                        label: '實驗數據點',
                         data: X.map((x, i) => ({ x: x, y: y[i] })),
-                        backgroundColor: 'blue',
-                        pointRadius: 5
-                    },
-                    {
-                        label: '線性回歸模型',
+                        backgroundColor: '#FF6B6B',
+                        borderColor: '#FF6B6B',
+                        pointRadius: 8,
+                        pointHoverRadius: 10
+                    }, {
+                        label: '線性迴歸模型',
                         type: 'line',
                         data: X.map(x => ({ x: x, y: regressionResult.equation[0] * x + regressionResult.equation[1] })),
-                        borderColor: 'red',
-                        borderWidth: 2,
+                        borderColor: '#5D5CDE',
+                        borderWidth: 3,
                         fill: false,
-                        pointRadius: 0
+                        pointRadius: 0,
+                        tension: 0
                     }]
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: isDark ? '#e5e7eb' : '#374151',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: '溶劑起始溫度(°C)'
+                                text: '溶劑起始溫度 (°C)',
+                                color: isDark ? '#e5e7eb' : '#374151',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                color: isDark ? '#d1d5db' : '#6b7280'
+                            },
+                            grid: {
+                                color: isDark ? '#374151' : '#e5e7eb'
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: '溶解時間 (s)'
+                                text: '溶解時間 (秒)',
+                                color: isDark ? '#e5e7eb' : '#374151',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                color: isDark ? '#d1d5db' : '#6b7280'
+                            },
+                            grid: {
+                                color: isDark ? '#374151' : '#e5e7eb'
                             }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true
                         }
                     }
                 }
             });
         }
 
-
         function predict() {
             const newTemp = parseFloat(document.getElementById('newTemp').value);
-            if (model) {
-                const predictedTime = model.equation[0] * newTemp + model.equation[1];
-                document.getElementById('predictionResult').textContent = `預測溶解時間: ${predictedTime.toFixed(2)} s`;
-            } else {
-                document.getElementById('error').textContent = '請先訓練模型。';
+            const resultDiv = document.getElementById('predictionResult');
+            
+            if (isNaN(newTemp)) {
+                showError('請輸入有效的溫度數值。');
+                return;
             }
+            
+            if (!model) {
+                showError('請先訓練模型。');
+                return;
+            }
+            
+            if (newTemp < -273.15) {
+                showError('溫度不能低於絕對零度 (-273.15°C)。');
+                return;
+            }
+
+            const predictedTime = model.equation[0] * newTemp + model.equation[1];
+            
+            if (predictedTime < 0) {
+                resultDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-2">⚠️</span>
+                        <div>
+                            <div class="font-bold">預測結果: ${predictedTime.toFixed(2)} 秒</div>
+                            <div class="text-sm opacity-75">注意：預測結果為負值，可能超出模型適用範圍</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-2">🎯</span>
+                        <div>
+                            <div class="font-bold">預測溶解時間: ${predictedTime.toFixed(2)} 秒</div>
+                            <div class="text-sm opacity-75">在 ${newTemp}°C 溫度下</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultDiv.classList.remove('hidden');
+            
+            // 清空輸入框
+            document.getElementById('newTemp').value = '';
         }
-
-
-
 
         function clearData() {
             data = [];
             model = null;
-            document.getElementById('predictionResult').textContent = '';
-            document.getElementById('error').textContent = '';
+            document.getElementById('predictionResult').classList.add('hidden');
+            document.getElementById('modelInfo').classList.add('hidden');
+            updateDataList();
 
             if (chart) {
                 chart.destroy();
                 chart = null;
             }
+            
+            // 成功提示
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✅ 已清空';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 1000);
         }
+
+        // 支持 Enter 鍵提交
+        document.getElementById('temp').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('time').focus();
+            }
+        });
+
+        document.getElementById('time').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addData();
+            }
+        });
+
+        document.getElementById('newTemp').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                predict();
+            }
+        });
+
+        // 初始化數據列表
+        updateDataList();
+
+        // === 科學問答助手功能 ===
+        
+        // 註冊聊天機器人回應處理器
+        if (window.Poe && window.Poe.registerHandler) {
+            window.Poe.registerHandler("science-chat-handler", (result, context) => {
+                const chatHistory = document.getElementById('chatHistory');
+                const askButton = document.getElementById('askButton');
+                
+                if (result.responses && result.responses.length > 0) {
+                    const response = result.responses[0];
+                    
+                    // 找到對應的機器人回應元素
+                    let botMessageDiv = document.querySelector(`[data-message-id="${response.messageId}"]`);
+                    
+                    if (!botMessageDiv) {
+                        // 創建新的機器人回應元素
+                        const botMessageHTML = `
+                            <div class="flex items-start space-x-3 mb-4" data-message-id="${response.messageId}">
+                                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                    🤖
+                                </div>
+                                <div class="flex-1 bg-white dark:bg-gray-600 rounded-lg p-3 shadow-sm">
+                                    <div class="bot-content text-gray-800 dark:text-gray-200 text-sm"></div>
+                                    <div class="bot-status text-xs text-gray-500 dark:text-gray-400 mt-2"></div>
+                                </div>
+                            </div>
+                        `;
+                        chatHistory.insertAdjacentHTML('beforeend', botMessageHTML);
+                        botMessageDiv = document.querySelector(`[data-message-id="${response.messageId}"]`);
+                    }
+                    
+                    const contentDiv = botMessageDiv.querySelector('.bot-content');
+                    const statusDiv = botMessageDiv.querySelector('.bot-status');
+                    
+                    if (response.status === "error") {
+                        contentDiv.innerHTML = `<span class="text-red-500">抱歉，發生錯誤：${response.statusText || '無法回應'}</span>`;
+                        statusDiv.textContent = '';
+                        askButton.disabled = false;
+                        askButton.textContent = '🚀 提問';
+                    } else if (response.status === "incomplete") {
+                        // 顯示流式回應
+                        contentDiv.innerHTML = formatMarkdown(response.content);
+                        statusDiv.innerHTML = '<span class="inline-flex items-center"><span class="animate-pulse mr-1">●</span>正在回應中...</span>';
+                    } else if (response.status === "complete") {
+                        // 顯示完成的回應
+                        contentDiv.innerHTML = formatMarkdown(response.content);
+                        statusDiv.textContent = '';
+                        askButton.disabled = false;
+                        askButton.textContent = '🚀 提問';
+                    }
+                    
+                    // 滾動到最新消息
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                }
+            });
+        }
+
+        // 簡單的Markdown格式化函數
+        function formatMarkdown(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // 檢查是否為科學相關問題
+        function isScienceRelated(question) {
+            const scienceKeywords = [
+                // 化學相關
+                '化學', '分子', '原子', '元素', '化合物', '反應', '溶解', '溶液', '濃度', '酸鹼', '催化劑', 'ph值', '離子',
+                // 物理相關  
+                '物理', '溫度', '熱力學', '能量', '動能', '位能', '力', '速度', '加速度', '重力', '壓力', '密度',
+                // 數學/統計相關
+                '迴歸', '統計', '數學', '方程式', '函數', '變數', '係數', '相關性', '機率', '標準差',
+                // 實驗相關
+                '實驗', '數據', '測量', '誤差', '精確度', '變因', '控制組', '實驗組',
+                // 一般科學詞彙
+                '科學', '理論', '假設', '定律', '原理', '模型', '研究', '分析', '觀察', '預測'
+            ];
+            
+            const lowerQuestion = question.toLowerCase();
+            return scienceKeywords.some(keyword => 
+                lowerQuestion.includes(keyword) || 
+                lowerQuestion.includes(keyword.toLowerCase())
+            );
+        }
+
+        // 發送科學問題
+        async function askScienceQuestion() {
+            const questionInput = document.getElementById('scienceQuestion');
+            const question = questionInput.value.trim();
+            const chatHistory = document.getElementById('chatHistory');
+            const askButton = document.getElementById('askButton');
+            
+            if (!question) {
+                showError('請輸入問題。');
+                return;
+            }
+            
+            // 檢查是否為科學相關問題
+            if (!isScienceRelated(question)) {
+                showError('抱歉，我只能回答科學相關的問題。請問關於化學、物理、數學、實驗等科學主題的問題。');
+                return;
+            }
+            
+            // 檢查Poe API是否可用
+            if (!window.Poe || !window.Poe.sendUserMessage) {
+                showError('聊天功能暫時無法使用，請稍後再試。');
+                return;
+            }
+            
+            // 添加用戶消息到聊天記錄
+            const userMessageHTML = `
+                <div class="flex items-start space-x-3 mb-4 justify-end">
+                    <div class="flex-1 bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 shadow-sm max-w-xs ml-auto">
+                        <p class="text-gray-800 dark:text-gray-200 text-sm">${question}</p>
+                    </div>
+                    <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                        👤
+                    </div>
+                </div>
+            `;
+            chatHistory.insertAdjacentHTML('beforeend', userMessageHTML);
+            
+            // 清空輸入框並禁用按鈕
+            questionInput.value = '';
+            askButton.disabled = true;
+            askButton.textContent = '🤔 思考中...';
+            
+            // 滾動到最新消息
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            
+            try {
+                // 發送消息給Claude，並指定只回答科學問題
+                const prompt = `@Claude-Sonnet-4 你是一個科學教學助手，專門回答化學、物理、數學、實驗等科學相關問題。請用繁體中文回答以下問題，並保持回答簡潔明瞭、適合學生理解：
+
+問題：${question}
+
+請確保回答內容準確且具有教育價值。如果問題不是科學相關的，請禮貌地說明你只能回答科學問題。`;
+                
+                await window.Poe.sendUserMessage(prompt, {
+                    handler: "science-chat-handler",
+                    stream: true,
+                    openChat: false
+                });
+                
+            } catch (err) {
+                console.error('發送消息失敗:', err);
+                askButton.disabled = false;
+                askButton.textContent = '🚀 提問';
+                
+                // 添加錯誤消息
+                const errorMessageHTML = `
+                    <div class="flex items-start space-x-3 mb-4">
+                        <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            ❌
+                        </div>
+                        <div class="flex-1 bg-red-50 dark:bg-red-900/20 rounded-lg p-3 shadow-sm">
+                            <p class="text-red-700 dark:text-red-400 text-sm">
+                                抱歉，無法發送問題。請稍後再試。
+                            </p>
+                        </div>
+                    </div>
+                `;
+                chatHistory.insertAdjacentHTML('beforeend', errorMessageHTML);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }
+
+        // 填入範例問題
+        function fillSampleQuestion(question) {
+            document.getElementById('scienceQuestion').value = question;
+        }
+
+        // 為科學問題輸入框添加Enter鍵支援
+        document.getElementById('scienceQuestion').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askScienceQuestion();
+            }
+        });
     </script>
-</body>
-</html>
+
+
+</body></html>
